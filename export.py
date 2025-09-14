@@ -166,7 +166,15 @@ def run_ui():
             if not source_file:
                 messagebox.showerror("Lỗi", "Hãy chọn file dữ liệu.")
                 return
-            target_file = os.path.join(exe_dir, "BÁO CÁO VẬN HÀNH BƯU CỤC.xlsx")
+            # Tạo thư mục con "JT report" trong Documents
+            documents = os.path.join(os.path.expanduser("~"), "Documents")
+            report_dir = os.path.join(documents, "JT report")
+            os.makedirs(report_dir, exist_ok=True)
+
+            # File báo cáo lưu vào đây
+            target_file = os.path.join(report_dir, "BÁO CÁO VẬN HÀNH BƯU CỤC.xlsx")
+
+
             result = generate_report(source_file, target_file)
             root.target_file = result
             messagebox.showinfo("Thành công", f"Đã tạo báo cáo:\n{result}\nFile đã được mở.")
@@ -175,9 +183,13 @@ def run_ui():
 
     def open_file_location():
         try:
-            subprocess.Popen(f'explorer "{exe_dir}"')
+            documents = os.path.join(os.path.expanduser("~"), "Documents")
+            report_dir = os.path.join(documents, "JT report")
+            os.makedirs(report_dir, exist_ok=True)  # đảm bảo tồn tại
+            subprocess.Popen(f'explorer "{report_dir}"')
         except Exception:
-            os.startfile(exe_dir)
+            os.startfile(report_dir)
+
 
     Label(root, text="Chọn file dữ liệu:").pack()
     Button(root, text="Browse...", command=choose_source).pack()

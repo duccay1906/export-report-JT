@@ -136,6 +136,47 @@ def generate_report(source_file, target_file):
     # Công thức M5 (chia tổng F cho số lượng nhân viên)
     num_employees = end_row - start_row + 1
     ws.cell(row=start_row, column=13, value=f"=$F${total_row}/{num_employees}")
+    
+    # --- Summary ở ô T2 ---
+    from datetime import datetime
+    # --- Tính toán số liệu tổng (trực tiếp từ DataFrame) ---
+    total_E_val = df_sorted["Col_I"].sum()   # Lượng đơn phát
+    total_F_val = df_sorted["Col_J"].sum()   # Đơn ký nhận
+    total_H_val = df_sorted["Col_L"].sum()   # Cột H trong Excel
+    avg_G_val   = (total_H_val + total_F_val) / (total_H_val + total_E_val) if (total_H_val + total_E_val) != 0 else 0
+    total_I_val = total_H_val                 # giả sử tồn kho chính là Col_L
+    total_J_val = total_I_val / (total_F_val + total_H_val) if (total_F_val + total_H_val) != 0 else 0
+    total_O_val = 0  # nếu cần thì bạn tính thêm từ df, tạm gán 0
+    
+    today_str = datetime.today().strftime("%d/%m/%Y")
+
+    summary_text = (
+        f"Ngày: {today_str}\n"
+        f"Bưu cục: 024F01\n"
+        f"Lượng đơn phát: {total_E_val}\n"
+        f"Đơn ký nhận: {total_F_val}\n"
+        f"Tỉ lệ kí nhận thời hiệu: \n"
+        f"Tỉ lệ ký nhận: {avg_G_val:.2%}\n"
+        f"Tồn: {total_I_val}\n"
+        f"Tỉ lệ tồn kho: {total_J_val:.2%}\n"
+        f"Tỉ lệ lấy thành công 3 sàn: {total_O_val:.2%}\n"
+        f"Tỉ lệ xuất kho: \n"
+        f"Tỉ lệ kiểm kho: "
+    )
+
+    # Merge vùng T2:X10
+    ws.merge_cells("T2:X10")
+    cell_summary = ws["T2"]
+    cell_summary.value = summary_text
+    cell_summary.alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
+    cell_summary.font = Font(name="Times New Roman", size=18)
+
+    # Thêm border cho vùng merge T2:X10
+    thin = Side(border_style="thin", color="000000")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    for row in ws.iter_rows(min_row=2, max_row=10, min_col=20, max_col=24):  # T=20 → X=24
+        for cell in row:
+            cell.border = border
 
     # Lưu file
     wb.save(target_file)

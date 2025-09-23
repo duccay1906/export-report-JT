@@ -2,6 +2,7 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.cell.cell import MergedCell
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+from openpyxl.utils import get_column_letter
 from tkinter import Tk, Label, Button, filedialog, messagebox
 import os
 import subprocess
@@ -19,6 +20,19 @@ def resource_path(relative_path):
     except Exception:
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
+
+# --- Hàm tự động điều chỉnh độ rộng cột ---
+def auto_fit(ws, cols, factor=1.2, padding=2):
+    from openpyxl.utils import get_column_letter
+    
+    for col_idx in cols:
+        max_length = 0
+        col_letter = get_column_letter(col_idx)
+        for cell in ws[col_letter]:
+            if cell.value is not None:
+                max_length = max(max_length, len(str(cell.value)))
+        adjusted_width = (max_length + padding) * factor
+        ws.column_dimensions[col_letter].width = adjusted_width
 
 # --- Hàm tạo báo cáo ---
 def generate_report(source_file, target_file):
@@ -110,7 +124,11 @@ def generate_report(source_file, target_file):
     for col in range(9, 17):
         col_letter = chr(64 + col)
         ws.cell(row=total_row, column=col, value=f"={col_letter}{start_row}")
-
+        # Format phần trăm cho ô tổng cột L (cột 12)
+    
+    cell_l_total = ws.cell(row=total_row, column=12)
+    cell_l_total.number_format = "0.00%"
+    
     ws.merge_cells(start_row=total_row, start_column=17, end_row=total_row, end_column=19)
     ws.cell(row=total_row, column=17, value=None)
 
@@ -137,46 +155,51 @@ def generate_report(source_file, target_file):
     num_employees = end_row - start_row + 1
     ws.cell(row=start_row, column=13, value=f"=$F${total_row}/{num_employees}")
     
-    # --- Summary ở ô T2 ---
+     # --- Summary ở ô T2 (dùng công thức Excel động) ---
     from datetime import datetime
-    # --- Tính toán số liệu tổng (trực tiếp từ DataFrame) ---
-    total_E_val = df_sorted["Col_I"].sum()   # Lượng đơn phát
-    total_F_val = df_sorted["Col_J"].sum()   # Đơn ký nhận
-    total_H_val = df_sorted["Col_L"].sum()   # Cột H trong Excel
-    avg_G_val   = (total_H_val + total_F_val) / (total_H_val + total_E_val) if (total_H_val + total_E_val) != 0 else 0
-    total_I_val = total_H_val                 # giả sử tồn kho chính là Col_L
-    total_J_val = total_I_val / (total_F_val + total_H_val) if (total_F_val + total_H_val) != 0 else 0
-    total_O_val = 0  # nếu cần thì bạn tính thêm từ df, tạm gán 0
-    
     today_str = datetime.today().strftime("%d/%m/%Y")
 
-    summary_text = (
-        f"Ngày: {today_str}\n"
-        f"Bưu cục: 024F01\n"
-        f"Lượng đơn phát: {total_E_val}\n"
-        f"Đơn ký nhận: {total_F_val}\n"
-        f"Tỉ lệ kí nhận thời hiệu: \n"
-        f"Tỉ lệ ký nhận: {avg_G_val:.2%}\n"
-        f"Tồn: {total_I_val}\n"
-        f"Tỉ lệ tồn kho: {total_J_val:.2%}\n"
-        f"Tỉ lệ lấy thành công 3 sàn: {total_O_val:.2%}\n"
-        f"Tỉ lệ xuất kho: \n"
-        f"Tỉ lệ kiểm kho: "
-    )
+    # --- Summary dạng bảng 2 cột (T, U) ---
+    summary_start_row = 4  # bắt đầu từ T4
+    summary_labels = [
+    ("Ngày", today_str),
+    ("Bưu cục", "024F01"),
+    ("Lượng đơn phát", f"=E{total_row}"),
+    ("Đơn ký nhận", f"=F{total_row}"),
+    ("Tỉ lệ ký nhận thời hiệu", None),      # để trống, format %
+    ("Tỉ lệ ký nhận", f"=G{total_row}"),
+    ("Tồn", f"=I{total_row}"),
+    ("Tỉ lệ tồn kho", f"=J{total_row}"),
+    ("Tỉ lệ lấy thành công 3 sàn", f"=O{total_row}"),
+    ("Tỉ lệ xuất kho", None),               # để trống, format %
+    ("Tỉ lệ kiểm kho", None),               # để trống, format %
+]
 
-    # Merge vùng T2:X10
-    ws.merge_cells("T2:X10")
-    cell_summary = ws["T2"]
-    cell_summary.value = summary_text
-    cell_summary.alignment = Alignment(wrap_text=True, vertical="top", horizontal="left")
-    cell_summary.font = Font(name="Times New Roman", size=18)
+    for i, (label, val) in enumerate(summary_labels):
+        row = summary_start_row + i
+        ws.cell(row=row, column=20, value=label)  # cột T
+        cell_val = ws.cell(row=row, column=21, value=val)  # cột U
+        cell_val.alignment = Alignment(vertical="center", horizontal="left")
+        
+        # Định dạng riêng cho từng loại
+        if val is None:  
+            cell_val.number_format = "0.00%"
+        elif isinstance(val, str) and val.startswith(("=G", "=J", "=O")):
+            cell_val.number_format = "0.00%"
+        elif isinstance(val, str) and val.startswith(("=E", "=F", "=I")):
+            cell_val.number_format = "0"
 
-    # Thêm border cho vùng merge T2:X10
-    thin = Side(border_style="thin", color="000000")
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
-    for row in ws.iter_rows(min_row=2, max_row=10, min_col=20, max_col=24):  # T=20 → X=24
+    # Format font + border cho bảng
+    for row in ws.iter_rows(min_row=summary_start_row,
+                            max_row=summary_start_row+len(summary_labels)-1,
+                            min_col=20, max_col=21):  # T, U
         for cell in row:
-            cell.border = border
+            cell.font = Font(name="Times New Roman", size=14)
+            cell.border = Border(left=Side(style="thin"), right=Side(style="thin"),
+                                top=Side(style="thin"), bottom=Side(style="thin"))     
+    
+    # Fit cho cột T (20) và U (21)
+    auto_fit(ws, [20, 21], factor=1.1)                                     
 
     # Lưu file
     wb.save(target_file)
@@ -212,8 +235,10 @@ def run_ui():
             report_dir = os.path.join(documents, "JT report")
             os.makedirs(report_dir, exist_ok=True)
 
+            from datetime import datetime
+            today_string = datetime.today().strftime("%d-%m-%Y")  # VD: 23-09-2025
             # File báo cáo lưu vào đây
-            target_file = os.path.join(report_dir, "BÁO CÁO VẬN HÀNH BƯU CỤC.xlsx")
+            target_file = os.path.join(report_dir, f"BÁO CÁO VẬN HÀNH BƯU CỤC_{today_string}.xlsx")
 
 
             result = generate_report(source_file, target_file)

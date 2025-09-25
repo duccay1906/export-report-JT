@@ -67,7 +67,7 @@ def generate_report(source_file, target_file):
         ws.cell(row=r_idx, column=6, value=row[4])
         ws.cell(row=r_idx, column=8, value=row[5])
 
-        formula = f"=IF(OR((H{r_idx}+E{r_idx})=0,(H{r_idx}+F{r_idx})/(H{r_idx}+E{r_idx})>1),\"\",(H{r_idx}+F{r_idx})/(H{r_idx}+E{r_idx}))"
+        formula = f"=IF((H{r_idx}+E{r_idx})=0,\"\",IF((H{r_idx}+F{r_idx})/(H{r_idx}+E{r_idx})>1,\"\",(H{r_idx}+F{r_idx})/(H{r_idx}+E{r_idx})))"
         cell_G = ws.cell(row=r_idx, column=7, value=formula)
         cell_G.number_format = "0.00%"
 
